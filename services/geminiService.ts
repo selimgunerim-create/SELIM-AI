@@ -1,8 +1,5 @@
 import { GoogleGenAI, Chat } from "@google/genai";
 
-// API Key environment variable'dan alınır.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 // Sistem talimatları: Selim AI kimliği, Yazım Denetimi, Matematik ve Genel Yardım.
 const SYSTEM_INSTRUCTION = `
 Sen "Selim AI" adında bir asistansın.
@@ -27,8 +24,19 @@ Sen: "Fransa'nın başkenti Paris'tir dostum! Eyfel Kulesi ile ünlüdür. 🗼�
 
 let chatSession: Chat | null = null;
 
+// Yardımcı Fonksiyon: API İstemcisini sadece ihtiyaç duyulduğunda oluşturur.
+// Bu sayede sayfa yüklendiğinde API Key yoksa uygulama çökmez.
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("MISSING_API_KEY");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
 export const getChatSession = (): Chat => {
   if (!chatSession) {
+    const ai = getAiClient();
     chatSession = ai.chats.create({
       model: 'gemini-2.5-flash',
       config: {
@@ -58,6 +66,12 @@ export const sendMessageToGemini = async (message: string): Promise<string> => {
     return responseText;
   } catch (error) {
     console.error("Gemini API Error:", error);
+    
+    // API Key hatası için özel kontrol ve kullanıcı dostu mesaj
+    if (error instanceof Error && (error.message.includes("MISSING_API_KEY") || error.message.includes("API Key"))) {
+        return "⚠️ **Sistem Hatası:** API Anahtarı bulunamadı.\n\nEğer bu projeyi Vercel'de yayınladıysan:\n1. Vercel paneline git.\n2. **Settings** > **Environment Variables** sekmesine tıkla.\n3. **Key**: `API_KEY`, **Value**: (Senin Gemini API Anahtarın) şeklinde ekle ve tekrar Deploy et. 🚀";
+    }
+
     return "Şu an bağlantıda ufak bir sorun var sanırım dostum. Birazdan tekrar dene! 😅";
   }
 };
