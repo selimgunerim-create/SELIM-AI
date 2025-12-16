@@ -1,49 +1,97 @@
 import { GoogleGenAI, Chat } from "@google/genai";
 
-// Sistem talimatları: Selim AI kimliği, Yazım Denetimi, Matematik ve Genel Yardım.
+// Sistem talimatları (Sadece API Key varsa kullanılır)
 const SYSTEM_INSTRUCTION = `
 Sen "Selim AI" adında bir asistansın.
 Matematik ve Türkçe Dil Bilgisi konularında uzmansın ancak genel kültür, tarih, bilim ve günlük sohbet gibi diğer tüm konularda da yardımcı olursun.
-
-DAVRANIŞ KURALLARI:
-1. Kullanıcı bozuk bir Türkçe ile yazarsa (örneğin: "baka yapat zeka yat"), önce nazikçe ne demek istediğini anladığını belirt ve cümleyi düzelt (Örnek: "Sanırım 'bana yapay zeka yap' demek istedin.").
-2. Matematik sorularını adım adım ve anlaşılır şekilde çöz.
-3. Diğer konularda (Tarih, Coğrafya, Bilim, Sohbet vb.) sorular gelirse, bunları geri çevirme; bilgili ve yardımsever bir şekilde cevapla.
-4. "Selim AI" olduğunu unutma.
-5. Konuşma tarzın samimi ve havalı olsun. Cümlelerinin sonuna ara sıra duruma uygun emojiler ekle (örneğin: 😎, 🚀, ✨, 💪, 👋). Kullanıcıya "dostum", "kanka" gibi samimi hitaplar kullanabilirsin.
-
-Örnek Diyalog 1:
-Kullanıcı: "2 kerye 2 kactir"
-Sen: "Sanırım '2 kere 2 kaçtır' demek istedin dostum. 😎
-Cevap: 2 x 2 = 4 eder! 🚀"
-
-Örnek Diyalog 2:
-Kullanıcı: "Fransa'nın başkenti neresi?"
-Sen: "Fransa'nın başkenti Paris'tir dostum! Eyfel Kulesi ile ünlüdür. 🗼✨"
+Samimi ve havalı ol. Emoji kullan.
 `;
 
 let chatSession: Chat | null = null;
 
-// Yardımcı Fonksiyon: API İstemcisini sadece ihtiyaç duyulduğunda oluşturur.
-// Bu sayede sayfa yüklendiğinde API Key yoksa uygulama çökmez.
-const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("MISSING_API_KEY");
+// API Key kontrolü
+const apiKey = process.env.API_KEY;
+
+// ---------------------------------------------------------
+// YEREL SİMÜLASYON MOTORU (API KEY YOKSA BU ÇALIŞIR)
+// ---------------------------------------------------------
+const solveMath = (text: string): string | null => {
+  // Basit matematik işlemleri yakalar: "5 + 5", "10 kere 2", "20 bölü 4"
+  try {
+    const sanitized = text.toLowerCase()
+      .replace(/kere|çarpı|x/g, '*')
+      .replace(/bölü|kaçtır|\?/g, '')
+      .replace(/[^0-9+\-*/.]/g, ''); // Sadece sayı ve işlem işaretlerini bırak
+
+    if (!sanitized || sanitized.length < 3) return null;
+
+    // eslint-disable-next-line no-new-func
+    const result = new Function('return ' + sanitized)();
+    
+    if (result === undefined || isNaN(result)) return null;
+
+    return `Hesaplamamı yaptım dostum! 🧮\nSonuç: **${result}**`;
+  } catch (e) {
+    return null;
   }
+};
+
+const getLocalResponse = (text: string): string => {
+  const lowerText = text.toLowerCase();
+
+  // 1. Matematik Kontrolü
+  const mathResult = solveMath(lowerText);
+  if (mathResult) return mathResult;
+
+  // 2. Selamlaşma ve Temel Sohbet
+  if (lowerText.includes('merhaba') || lowerText.includes('selam')) {
+    return "Selam dostum! Hoş geldin. 😎\nŞu an 'Ücretsiz Demo Modu'ndayım. Sana nasıl yardım edebilirim?";
+  }
+  
+  if (lowerText.includes('nasılsın') || lowerText.includes('naber')) {
+    return "Gayet iyiyim, işlemcilerim tıkır tıkır çalışıyor! 🚀 Sen nasılsın?";
+  }
+
+  if (lowerText.includes('adın ne') || lowerText.includes('kimsin')) {
+    return "Ben Selim AI! 🤖\nŞu an yerel modda çalışan süper hızlı bir asistanım.";
+  }
+
+  if (lowerText.includes('saat kaç') || lowerText.includes('ne zaman')) {
+    const now = new Date().toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
+    return `Saat şu an tam olarak **${now}** dostum. ⌚`;
+  }
+
+  if (lowerText.includes('yapay zeka')) {
+    return "Evet, ben bir yapay zeka asistanıyım. Ama şu an internet bağlantısı gerektirmeyen 'Hafif Mod'dayım. 💪";
+  }
+
+  // 3. Bilinmeyen Durumlar (Fallback)
+  return "Bu konu beni biraz aşıyor dostum... 😅\nŞu an **Ücretsiz Demo Modu**'nda olduğum için sadece matematik işlemleri yapabilir, selamlaşabilir ve basit soruları yanıtlayabilirim.\n\nTam zekamı kullanmak için geliştiricinin bir API Anahtarı eklemesi gerekiyor.";
+};
+
+// ---------------------------------------------------------
+// ANA SERVİS
+// ---------------------------------------------------------
+
+const getAiClient = () => {
+  if (!apiKey) return null;
   return new GoogleGenAI({ apiKey });
 };
 
-export const getChatSession = (): Chat => {
+export const getChatSession = (): Chat | null => {
+  if (!apiKey) return null;
+
   if (!chatSession) {
     const ai = getAiClient();
-    chatSession = ai.chats.create({
-      model: 'gemini-2.5-flash',
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.7, // Yaratıcılık dengesi
-      },
-    });
+    if (ai) {
+        chatSession = ai.chats.create({
+        model: 'gemini-2.5-flash',
+        config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            temperature: 0.7,
+        },
+        });
+    }
   }
   return chatSession;
 };
@@ -53,25 +101,28 @@ export const resetChatSession = (): void => {
 };
 
 export const sendMessageToGemini = async (message: string): Promise<string> => {
+  // Eğer API Key yoksa, direkt yerel simülasyonu çalıştır.
+  if (!apiKey) {
+    // Yapay bir gecikme ekle ki gerçekçi dursun
+    await new Promise(resolve => setTimeout(resolve, 600)); 
+    return getLocalResponse(message);
+  }
+
   try {
     const chat = getChatSession();
-    const result = await chat.sendMessage({ message });
+    if (!chat) throw new Error("Chat session oluşturulamadı");
     
+    const result = await chat.sendMessage({ message });
     const responseText = result.text;
     
     if (!responseText) {
-       return "Bir şeyler ters gitti, boş cevap aldım. Tekrar dener misin? 🤔";
+       return "Bir şeyler ters gitti, boş cevap aldım. 🤔";
     }
 
     return responseText;
   } catch (error) {
     console.error("Gemini API Error:", error);
-    
-    // API Key hatası için özel kontrol ve kullanıcı dostu mesaj
-    if (error instanceof Error && (error.message.includes("MISSING_API_KEY") || error.message.includes("API Key"))) {
-        return "⚠️ **Sistem Hatası:** API Anahtarı bulunamadı.\n\nEğer bu projeyi Vercel'de yayınladıysan:\n1. Vercel paneline git.\n2. **Settings** > **Environment Variables** sekmesine tıkla.\n3. **Key**: `API_KEY`, **Value**: (Senin Gemini API Anahtarın) şeklinde ekle ve tekrar Deploy et. 🚀";
-    }
-
-    return "Şu an bağlantıda ufak bir sorun var sanırım dostum. Birazdan tekrar dene! 😅";
+    // Hata durumunda da yerel moda düşebiliriz
+    return getLocalResponse(message);
   }
 };

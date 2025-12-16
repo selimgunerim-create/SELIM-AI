@@ -5,13 +5,18 @@ import { MessageBubble } from './components/MessageBubble';
 import { ChatInput } from './components/ChatInput';
 import { Calculator } from './components/Calculator';
 import { MiniGame } from './components/MiniGame';
-import { Sparkles, Trash2, Calculator as CalcIcon, Gamepad2, AlertCircle } from 'lucide-react';
+import { Sparkles, Trash2, Calculator as CalcIcon, Gamepad2, AlertCircle, WifiOff } from 'lucide-react';
 
 const App: React.FC = () => {
+  // API Key var mı kontrolü (Frontend tarafında process.env genelde build time'da gömülür)
+  const isDemoMode = !process.env.API_KEY;
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Merhaba dostum! Ben Selim AI. 😎\nMatematik sorularını çözebilir, yazdığın cümleleri düzeltebilir ve aklına gelen her konuda sohbet edebilirim. Ayrıca yeni mini oyunumuzu denedin mi? 🚀',
+      text: isDemoMode 
+        ? 'Selam! Ben Selim AI. 😎\nŞu an **Ücretsiz Demo Modu**ndayım. Matematik sorularını çözebilirim ve seninle sohbet edebilirim. API anahtarı olmadığı için internete bağlanamıyorum ama yerel zekamla buradayım! 💪'
+        : 'Merhaba dostum! Ben Selim AI. 😎\nMatematik sorularını çözebilir, yazdığın cümleleri düzeltebilir ve aklına gelen her konuda sohbet edebilirim. Ayrıca yeni mini oyunumuzu denedin mi? 🚀',
       sender: Sender.Bot,
       timestamp: new Date(),
     },
@@ -56,7 +61,7 @@ const App: React.FC = () => {
     } catch (error) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Bağlantıda bir sorun oldu dostum, tekrar dener misin? 😔",
+        text: "Bağlantıda bir sorun oldu dostum. 😔",
         sender: Sender.Bot,
         timestamp: new Date(),
         isError: true,
@@ -67,18 +72,16 @@ const App: React.FC = () => {
     }
   };
 
-  // Butona basıldığında sadece modalı açar
   const handleClearClick = () => {
     setShowClearConfirm(true);
   };
 
-  // Onaylandığında silme işlemini yapar
   const confirmClearChat = () => {
     resetChatSession();
     setMessages([
       {
         id: Date.now().toString(),
-        text: 'Sohbet ve hafızam temizlendi. Sıfırdan başlıyoruz dostum! 🚀',
+        text: 'Sohbet temizlendi. Tertemiz bir sayfa! 🚀',
         sender: Sender.Bot,
         timestamp: new Date(),
       },
@@ -86,13 +89,11 @@ const App: React.FC = () => {
     setShowClearConfirm(false);
   };
 
-  // İptal edildiğinde modalı kapatır
   const cancelClearChat = () => {
     setShowClearConfirm(false);
   };
 
   return (
-    // glass sınıfı yerine manuel stil vererek biraz daha şeffaflık sağladık (bg-opacity)
     <div className="w-full h-full md:h-[90vh] bg-white/70 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl flex flex-col overflow-hidden relative">
       
       {/* Top Browser Bar Decoration */}
@@ -110,11 +111,18 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="bg-white/60 backdrop-blur-md border-b border-white/20 px-6 py-4 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-tr from-orange-400 to-pink-600 rounded-xl flex items-center justify-center text-white shadow-lg transform hover:rotate-6 transition-transform">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg transform hover:rotate-6 transition-transform ${isDemoMode ? 'bg-gray-700' : 'bg-gradient-to-tr from-orange-400 to-pink-600'}`}>
             <Sparkles size={24} />
           </div>
           <div>
-            <h1 className="font-bold text-gray-800 text-xl leading-tight tracking-tight">SELİM AI</h1>
+            <h1 className="font-bold text-gray-800 text-xl leading-tight tracking-tight flex items-center gap-2">
+                SELİM AI
+                {isDemoMode && (
+                    <span className="px-2 py-0.5 bg-gray-200 text-gray-600 text-[10px] rounded-full uppercase tracking-wider font-bold border border-gray-300">
+                        Demo Modu
+                    </span>
+                )}
+            </h1>
             <p className="text-xs text-gray-500 font-semibold tracking-wide">AI COMPANION</p>
           </div>
         </div>
@@ -197,7 +205,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Mini Game FAB (Compact & Relocated) */}
+      {/* Mini Game FAB */}
       <div className="absolute bottom-5 left-4 md:left-6 z-30">
         <button 
           onClick={() => setShowMiniGame(true)}
